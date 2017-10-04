@@ -1,0 +1,59 @@
+### Installing Packages
+#install.packages("TTR", repos = "http://cran.us.r-project.org")
+#install.packages("quantmod", repos = "http://cran.us.r-project.org")
+#install.packages("xts", repos = "http://cran.us.r-project.org")
+#install.packages("zoo", repos = "http://cran.us.r-project.org")
+#install.packages("dplyr", repos = "http://cran.us.r-project.org")
+#install.packages("tidyr", repos = "http://cran.us.r-project.org")
+
+library(TTR)
+library(quantmod)
+library(xts)
+library(zoo)
+library(dplyr)
+library(tidyr)
+
+### Loading bitcoin_price_sorted
+BPS_data <- read.csv('bitcoin_price_sorted.csv')
+
+### Correcting Volume and Market.Cap
+BPS_data$Volume <- as.numeric(gsub(",","",as.character(BPS_data$Volume)))
+BPS_data$Market.Cap <- as.numeric(gsub(",","",as.character(BPS_data$Market.Cap)))
+
+### Removing NAs
+BPS_data_nona <- na.omit(BPS_data)
+
+### Constructing Technical Indicators
+
+## EMA
+ema_10 <- EMA(BPS_data_nona$Close, n = 10)
+ema_21 <- EMA(BPS_data_nona$Close, n = 21)
+
+# Making new data frame:
+features_nona <- data.frame(ema_10,ema_21)
+
+## Bollinger Bands
+x <- data.frame(BBands(BPS_data_nona[,c('High','Low','Close')], n = 20, maType = SMA, sd = 2))
+
+# Fixing column names:
+y = 0
+for(i in colnames(x)){
+    y = y + 1
+    colnames(x)[y] <- paste('BBands_20', i, sep = ".")
+}
+
+# Combining with 'features':
+features_nona <- cbind(features_nona,x)
+
+## Trend Detection Index
+features_nona$TDI_20 <- TDI(BPS_data_nona$Close, n = 20, multiple = 2)
+
+## On Balance Volume
+features_nona$OBV <- OBV(BPS_data_nona$Close, BPS_data_nona$Volume)
+
+## ROC / Momentum
+features_nona$ROC <- ROC(BPS_data_nona$Close, n = 1, type = "continuous", na.pad = TRUE)
+features_nona$ROC_momentum <- momentum(BPS_data_nona$Close, n = 1, na.pad = TRUE)
+
+### Exporting data frame:
+write.csv(features_nona, file = "features_nona.csv", row.names = TRUE)
